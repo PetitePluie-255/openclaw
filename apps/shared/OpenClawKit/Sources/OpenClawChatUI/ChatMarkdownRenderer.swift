@@ -22,12 +22,19 @@ struct ChatMarkdownRenderer: View {
     var body: some View {
         let processed = ChatMarkdownPreprocessor.preprocess(markdown: self.text)
         VStack(alignment: .leading, spacing: 10) {
-            StructuredText(markdown: processed.cleaned)
-                .modifier(ChatMarkdownStyle(
-                    variant: self.variant,
-                    context: self.context,
-                    font: self.font,
-                    textColor: self.textColor))
+            if #available(macOS 15, iOS 18, *) {
+                StructuredText(markdown: processed.cleaned)
+                    .modifier(ChatMarkdownStyle(
+                        variant: self.variant,
+                        context: self.context,
+                        font: self.font,
+                        textColor: self.textColor))
+            } else {
+                Text(LocalizedStringKey(processed.cleaned))
+                    .font(self.font)
+                    .foregroundStyle(self.textColor)
+                    .textSelection(.enabled)
+            }
 
             if !processed.images.isEmpty {
                 InlineImageList(images: processed.images)
@@ -36,6 +43,7 @@ struct ChatMarkdownRenderer: View {
     }
 }
 
+@available(macOS 15, iOS 18, *)
 private struct ChatMarkdownStyle: ViewModifier {
     let variant: ChatMarkdownVariant
     let context: ChatMarkdownRenderer.Context

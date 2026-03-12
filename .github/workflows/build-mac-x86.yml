@@ -52,32 +52,50 @@ jobs:
             ${{ runner.os }}-build-x86-${{ hashFiles('apps/macos/Package.resolved') }}-
             ${{ runner.os }}-build-x86-
 
-      - name: Patch Package.swift and Info.plist for macOS 13 compatibility
+      - name: Patch project Package.swift files for macOS 13
         run: |
+          # Phase 1: Lower project platform declarations from v15 to v13
           sed -i '' 's/\.macOS(\.v15)/\.macOS(\.v13)/g' apps/macos/Package.swift
           sed -i '' 's/\.macOS(\.v15)/\.macOS(\.v13)/g' apps/shared/OpenClawKit/Package.swift
           sed -i '' 's/\.macOS(\.v15)/\.macOS(\.v13)/g' Swabble/Package.swift
           sed -i '' 's/15\.0/13\.0/g' apps/macos/Sources/OpenClaw/Resources/Info.plist
 
-          echo "Verifying patches (should show v13):"
+          echo "✓ Project Package.swift files patched to macOS 13"
           grep -h "macOS(" apps/macos/Package.swift apps/shared/OpenClawKit/Package.swift Swabble/Package.swift
-          grep "13\.0" apps/macos/Sources/OpenClaw/Resources/Info.plist
+
+      - name: Resolve dependencies and patch checkouts for macOS 13
+        working-directory: apps/macos
+        run: |
+          # Phase 2: Resolve deps (downloads to .build/checkouts/), then lower
+          # their platform declarations so SPM doesn't reject the v13 target.
+          # These libraries (Commander, ElevenLabsKit, Peekaboo, Textual) use
+          # only Foundation/AudioToolbox/OSLog — their v14/v15 minimums are
+          # conservative, not technically required.
+          swift package resolve
+
+          echo "Patching dependency checkouts..."
+          find .build/checkouts -name "Package.swift" -exec \
+            sed -i '' \
+              -e 's/\.macOS(\.v14)/\.macOS(\.v13)/g' \
+              -e 's/\.macOS(\.v15)/\.macOS(\.v13)/g' \
+              {} +
+
+          echo "✓ Dependency Package.swift files patched"
+          find .build/checkouts -name "Package.swift" -exec grep -l "macOS" {} + | head -10
 
       - name: Build Mac App
         env:
-          # CI environments usually don't have Apple Developer certificates configured.
-          # ALLOW_ADHOC_SIGNING=1 allows the script to fallback to ad-hoc ("-") signing,
-          # avoiding build failure due to missing certificates.
           ALLOW_ADHOC_SIGNING: 1
           BUILD_CONFIG: release
-          # Force deployment target to macOS 13
           MACOSX_DEPLOYMENT_TARGET: "13.0"
         run: |
           echo "Building architectures: x86_64"
           chmod +x scripts/package-mac-app.sh
           chmod +x scripts/codesign-mac-app.sh
 
-          # Force the package script to build x86_64 architecture only
+          # Force the package script to build x86_64 architecture only.
+          # Dependencies are already resolved and patched; --skip-update
+          # prevents SPM from re-fetching and overwriting our patches.
           BUILD_ARCHS="x86_64" ./scripts/package-mac-app.sh
 
       - name: Compress App Bundle
