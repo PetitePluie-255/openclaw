@@ -54,34 +54,55 @@ jobs:
 
       - name: Patch project Package.swift files for macOS 13
         run: |
-          # Phase 1: Lower project platform declarations from v15 to v13
           sed -i '' 's/\.macOS(\.v15)/\.macOS(\.v13)/g' apps/macos/Package.swift
           sed -i '' 's/\.macOS(\.v15)/\.macOS(\.v13)/g' apps/shared/OpenClawKit/Package.swift
           sed -i '' 's/\.macOS(\.v15)/\.macOS(\.v13)/g' Swabble/Package.swift
           sed -i '' 's/15\.0/13\.0/g' apps/macos/Sources/OpenClaw/Resources/Info.plist
 
           echo "✓ Project Package.swift files patched to macOS 13"
-          grep -h "macOS(" apps/macos/Package.swift apps/shared/OpenClawKit/Package.swift Swabble/Package.swift
 
       - name: Resolve dependencies and patch checkouts for macOS 13
         working-directory: apps/macos
         run: |
-          # Phase 2: Resolve deps (downloads to .build/checkouts/), then lower
-          # their platform declarations so SPM doesn't reject the v13 target.
-          # These libraries (Commander, ElevenLabsKit, Peekaboo, Textual) use
-          # only Foundation/AudioToolbox/OSLog — their v14/v15 minimums are
-          # conservative, not technically required.
-          swift package resolve
+          # Resolve into the same --build-path that package-mac-app.sh uses
+          # for x86_64 builds, so the patched checkouts are the ones actually
+          # compiled.
+          swift package resolve --build-path .build/x86_64
 
-          echo "Patching dependency checkouts..."
-          find .build/checkouts -name "Package.swift" -exec \
-            sed -i '' \
-              -e 's/\.macOS(\.v14)/\.macOS(\.v13)/g' \
-              -e 's/\.macOS(\.v15)/\.macOS(\.v13)/g' \
-              {} +
+          CHECKOUTS=".build/x86_64/checkouts"
 
-          echo "✓ Dependency Package.swift files patched"
-          find .build/checkouts -name "Package.swift" -exec grep -l "macOS" {} + | head -10
+          # Only patch the 4 deps whose platform minimums are conservative:
+          #   peekaboo (.v14), commander (.v14), textual (.v15), elevenlabskit (.v15)
+          FAILED=0
+          for dep in peekaboo commander textual elevenlabskit; do
+            PKG="$CHECKOUTS/$dep/Package.swift"
+            if [ -f "$PKG" ]; then
+              sed -i '' \
+                -e 's/\.macOS(\.v14)/\.macOS(\.v13)/g' \
+                -e 's/\.macOS(\.v15)/\.macOS(\.v13)/g' \
+                "$PKG"
+              echo "  ✓ Patched $dep"
+            else
+              echo "  ✗ MISSING: $PKG"
+              FAILED=1
+            fi
+          done
+
+          # axorcist is a transitive dep of peekaboo, also needs patching
+          AXORCIST="$CHECKOUTS/axorcist/Package.swift"
+          if [ -f "$AXORCIST" ]; then
+            sed -i '' 's/\.macOS(\.v14)/\.macOS(\.v13)/g' "$AXORCIST"
+            echo "  ✓ Patched axorcist (transitive)"
+          else
+            echo "  ✗ MISSING: $AXORCIST"
+            FAILED=1
+          fi
+
+          if [ "$FAILED" -ne 0 ]; then
+            echo "::error::One or more dependency checkouts not found. Listing checkouts:"
+            ls -1 "$CHECKOUTS" 2>/dev/null || echo "(directory not found)"
+            exit 1
+          fi
 
       - name: Build Mac App
         env:
@@ -92,10 +113,6 @@ jobs:
           echo "Building architectures: x86_64"
           chmod +x scripts/package-mac-app.sh
           chmod +x scripts/codesign-mac-app.sh
-
-          # Force the package script to build x86_64 architecture only.
-          # Dependencies are already resolved and patched; --skip-update
-          # prevents SPM from re-fetching and overwriting our patches.
           BUILD_ARCHS="x86_64" ./scripts/package-mac-app.sh
 
       - name: Compress App Bundle
