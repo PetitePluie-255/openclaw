@@ -8,6 +8,16 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      arch:
+        description: "Architecture to build"
+        required: true
+        type: choice
+        default: "Universal (arm64 x86_64)"
+        options:
+          - "Universal (arm64 x86_64)"
+          - "Apple Silicon (arm64)"
+          - "Intel (x86_64)"
 
 jobs:
   build:
@@ -43,6 +53,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-swiftpm-
 
+      - name: Cache Swift Build Object Cache
+        uses: actions/cache@v4
+        with:
+          path: apps/macos/.build
+          key: ${{ runner.os }}-swift-build-${{ hashFiles('apps/macos/Package.resolved') }}-${{ hashFiles('apps/macos/Sources/**/*.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-swift-build-${{ hashFiles('apps/macos/Package.resolved') }}-
+            ${{ runner.os }}-swift-build-
+
       - name: Build Mac App
         env:
           # CI environments usually don't have Apple Developer certificates configured.
@@ -51,9 +70,20 @@ jobs:
           ALLOW_ADHOC_SIGNING: 1
           # Release config creates Universal Binary (arm64 x86_64) by default
           BUILD_CONFIG: release
-          # Explicitly target both architectures just to be absolutely sure
-          BUILD_ARCHS: "arm64 x86_64"
         run: |
+          CHOSEN_ARCH="${{ github.event.inputs.arch }}"
+
+          if [[ "$CHOSEN_ARCH" == "Apple Silicon (arm64)" ]]; then
+             export BUILD_ARCHS="arm64"
+          elif [[ "$CHOSEN_ARCH" == "Intel (x86_64)" ]]; then
+             export BUILD_ARCHS="x86_64"
+          else
+             # Default fallback (Universal) or push/PR event trigger
+             export BUILD_ARCHS="arm64 x86_64"
+          fi
+
+          echo "Building architectures: $BUILD_ARCHS"
+
           chmod +x scripts/package-mac-app.sh
           chmod +x scripts/codesign-mac-app.sh
           ./scripts/package-mac-app.sh
