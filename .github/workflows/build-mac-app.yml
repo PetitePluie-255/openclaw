@@ -86,7 +86,7 @@ jobs:
 
           chmod +x scripts/package-mac-app.sh
           chmod +x scripts/codesign-mac-app.sh
-          ./scripts/package-mac-app.sh
+          BUILD_ARCHS="$BUILD_ARCHS" ./scripts/package-mac-app.sh
 
       - name: Compress App Bundle
         # `actions/upload-artifact` can lose macOS symlinks/executable permissions if uploading a directory.
