@@ -1,6 +1,35 @@
 // swift-tools-version: 6.2
 
+import Foundation
 import PackageDescription
+
+let disableTextual = ProcessInfo.processInfo.environment["OPENCLAW_DISABLE_TEXTUAL"] == "1"
+
+var packageDependencies: [Package.Dependency] = [
+    .package(url: "https://github.com/steipete/ElevenLabsKit", exact: "0.1.0"),
+    .package(url: "https://github.com/gonzalezreal/swift-markdown-ui", from: "2.4.1"),
+]
+
+if !disableTextual {
+    packageDependencies.append(
+        .package(url: "https://github.com/gonzalezreal/textual", exact: "0.3.1"))
+}
+
+var openClawChatUIDependencies: [Target.Dependency] = [
+    "OpenClawKit",
+    .product(
+        name: "MarkdownUI",
+        package: "swift-markdown-ui",
+        condition: .when(platforms: [.macOS, .iOS])),
+]
+
+if !disableTextual {
+    openClawChatUIDependencies.append(
+        .product(
+            name: "Textual",
+            package: "textual",
+            condition: .when(platforms: [.macOS, .iOS])))
+}
 
 let package = Package(
     name: "OpenClawKit",
@@ -13,11 +42,7 @@ let package = Package(
         .library(name: "OpenClawKit", targets: ["OpenClawKit"]),
         .library(name: "OpenClawChatUI", targets: ["OpenClawChatUI"]),
     ],
-    dependencies: [
-        .package(url: "https://github.com/steipete/ElevenLabsKit", exact: "0.1.0"),
-        .package(url: "https://github.com/gonzalezreal/textual", exact: "0.3.1"),
-        .package(url: "https://github.com/gonzalezreal/swift-markdown-ui", from: "2.4.1"),
-    ],
+    dependencies: packageDependencies,
     targets: [
         .target(
             name: "OpenClawProtocol",
@@ -40,17 +65,7 @@ let package = Package(
             ]),
         .target(
             name: "OpenClawChatUI",
-            dependencies: [
-                "OpenClawKit",
-                .product(
-                    name: "Textual",
-                    package: "textual",
-                    condition: .when(platforms: [.macOS, .iOS])),
-                .product(
-                    name: "MarkdownUI",
-                    package: "swift-markdown-ui",
-                    condition: .when(platforms: [.macOS, .iOS])),
-            ],
+            dependencies: openClawChatUIDependencies,
             path: "Sources/OpenClawChatUI",
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),

@@ -1,6 +1,8 @@
 import SwiftUI
 import MarkdownUI
+#if canImport(Textual)
 import Textual
+#endif
 
 public enum ChatMarkdownVariant: String, CaseIterable, Sendable {
     case standard
@@ -23,7 +25,7 @@ struct ChatMarkdownRenderer: View {
     var body: some View {
         let processed = ChatMarkdownPreprocessor.preprocess(markdown: self.text)
         VStack(alignment: .leading, spacing: 10) {
-            if #available(macOS 15, iOS 18, *) {
+            if #available(macOS 15, iOS 18, *), _textualAvailable {
                 StructuredText(markdown: processed.cleaned)
                     .modifier(ChatMarkdownStyle(
                         variant: self.variant,
@@ -45,6 +47,9 @@ struct ChatMarkdownRenderer: View {
         }
     }
 }
+
+#if canImport(Textual)
+private let _textualAvailable = true
 
 @available(macOS 15, iOS 18, *)
 private struct ChatMarkdownStyle: ViewModifier {
@@ -75,6 +80,9 @@ private struct ChatMarkdownStyle: ViewModifier {
             .link(.foregroundColor(linkColor))
     }
 }
+#else
+private let _textualAvailable = false
+#endif
 
 @MainActor
 private struct InlineImageList: View {

@@ -67,7 +67,7 @@ jobs:
           # Resolve into the same --build-path that package-mac-app.sh uses
           # for x86_64 builds, so the patched checkouts are the ones actually
           # compiled.
-          swift package resolve --build-path .build/x86_64
+          OPENCLAW_DISABLE_TEXTUAL=1 swift package resolve --build-path .build/x86_64
 
           CHECKOUT_ROOTS=(
             ".build/x86_64/checkouts"
@@ -75,7 +75,7 @@ jobs:
           )
 
           FAILED=0
-          patch_dep() {
+          patch_dep_required() {
             local dep="$1"
             local found=0
             for root in "${CHECKOUT_ROOTS[@]}"; do
@@ -95,9 +95,33 @@ jobs:
             fi
           }
 
-          # Patch direct and transitive dependencies that declare macOS 14/15.
-          for dep in peekaboo commander textual elevenlabskit swiftui-math axorcist; do
-            patch_dep "$dep"
+          patch_dep_optional() {
+            local dep="$1"
+            local found=0
+            for root in "${CHECKOUT_ROOTS[@]}"; do
+              local pkg="$root/$dep/Package.swift"
+              if [ -f "$pkg" ]; then
+                sed -i '' \
+                  -e 's/\.macOS(\.v14)/\.macOS(\.v13)/g' \
+                  -e 's/\.macOS(\.v15)/\.macOS(\.v13)/g' \
+                  "$pkg"
+                echo "  ✓ Patched $dep at $root"
+                found=1
+              fi
+            done
+            if [ "$found" -eq 0 ]; then
+              echo "  • Optional dep not present: $dep"
+            fi
+          }
+
+          # Required deps for the macOS 13 compatibility build.
+          for dep in peekaboo commander elevenlabskit axorcist; do
+            patch_dep_required "$dep"
+          done
+
+          # Optional (present only when Textual path is enabled).
+          for dep in textual swiftui-math; do
+            patch_dep_optional "$dep"
           done
 
           if [ "$FAILED" -ne 0 ]; then
@@ -114,6 +138,7 @@ jobs:
           ALLOW_ADHOC_SIGNING: 1
           BUILD_CONFIG: release
           MACOSX_DEPLOYMENT_TARGET: "13.0"
+          OPENCLAW_DISABLE_TEXTUAL: "1"
         run: |
           echo "Building architectures: x86_64"
           chmod +x scripts/package-mac-app.sh
