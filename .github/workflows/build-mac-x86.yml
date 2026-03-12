@@ -1,4 +1,4 @@
-name: Build macOS App
+name: Build macOS App (Intel x86_64)
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    name: Build OpenClaw for macOS
+    name: Build OpenClaw (x86_64)
     # Use macOS 15, which has newer Xcode versions available (Xcode 16+)
     runs-on: macos-15
 
@@ -47,10 +47,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: apps/macos/.build
-          key: ${{ runner.os }}-swift-build-${{ hashFiles('apps/macos/Package.resolved') }}-${{ hashFiles('apps/macos/Sources/**/*.swift') }}
+          key: ${{ runner.os }}-build-x86-${{ hashFiles('apps/macos/Package.resolved') }}-${{ hashFiles('apps/macos/Sources/**/*.swift') }}
           restore-keys: |
-            ${{ runner.os }}-swift-build-${{ hashFiles('apps/macos/Package.resolved') }}-
-            ${{ runner.os }}-swift-build-
+            ${{ runner.os }}-build-x86-${{ hashFiles('apps/macos/Package.resolved') }}-
+            ${{ runner.os }}-build-x86-
 
       - name: Build Mac App
         env:
@@ -58,25 +58,25 @@ jobs:
           # ALLOW_ADHOC_SIGNING=1 allows the script to fallback to ad-hoc ("-") signing,
           # avoiding build failure due to missing certificates.
           ALLOW_ADHOC_SIGNING: 1
-          # Release config creates Universal Binary (arm64 x86_64) by default
           BUILD_CONFIG: release
         run: |
-          echo "Building architectures: arm64 x86_64"
-
+          echo "Building architectures: x86_64"
           chmod +x scripts/package-mac-app.sh
           chmod +x scripts/codesign-mac-app.sh
-          BUILD_ARCHS="arm64 x86_64" ./scripts/package-mac-app.sh
+
+          # Force the package script to build x86_64 architecture only
+          BUILD_ARCHS="x86_64" ./scripts/package-mac-app.sh
 
       - name: Compress App Bundle
         # `actions/upload-artifact` can lose macOS symlinks/executable permissions if uploading a directory.
         # It's safest to zip the `.app` bundle explicitly before uploading.
         run: |
           cd dist
-          zip -ry OpenClaw-macOS.zip OpenClaw.app
+          zip -ry OpenClaw-macOS-x86_64.zip OpenClaw.app
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OpenClaw-macOS-App
-          path: dist/OpenClaw-macOS.zip
+          name: OpenClaw-macOS-x86_64
+          path: dist/OpenClaw-macOS-x86_64.zip
           retention-days: 7
