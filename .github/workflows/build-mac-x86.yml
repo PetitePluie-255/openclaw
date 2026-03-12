@@ -69,38 +69,43 @@ jobs:
           # compiled.
           swift package resolve --build-path .build/x86_64
 
-          CHECKOUTS=".build/x86_64/checkouts"
+          CHECKOUT_ROOTS=(
+            ".build/x86_64/checkouts"
+            ".build/x86_64/SourcePackages/checkouts"
+          )
 
-          # Only patch the 4 deps whose platform minimums are conservative:
-          #   peekaboo (.v14), commander (.v14), textual (.v15), elevenlabskit (.v15)
           FAILED=0
-          for dep in peekaboo commander textual elevenlabskit; do
-            PKG="$CHECKOUTS/$dep/Package.swift"
-            if [ -f "$PKG" ]; then
-              sed -i '' \
-                -e 's/\.macOS(\.v14)/\.macOS(\.v13)/g' \
-                -e 's/\.macOS(\.v15)/\.macOS(\.v13)/g' \
-                "$PKG"
-              echo "  ✓ Patched $dep"
-            else
-              echo "  ✗ MISSING: $PKG"
+          patch_dep() {
+            local dep="$1"
+            local found=0
+            for root in "${CHECKOUT_ROOTS[@]}"; do
+              local pkg="$root/$dep/Package.swift"
+              if [ -f "$pkg" ]; then
+                sed -i '' \
+                  -e 's/\.macOS(\.v14)/\.macOS(\.v13)/g' \
+                  -e 's/\.macOS(\.v15)/\.macOS(\.v13)/g' \
+                  "$pkg"
+                echo "  ✓ Patched $dep at $root"
+                found=1
+              fi
+            done
+            if [ "$found" -eq 0 ]; then
+              echo "  ✗ MISSING: $dep (searched in ${CHECKOUT_ROOTS[*]})"
               FAILED=1
             fi
-          done
+          }
 
-          # axorcist is a transitive dep of peekaboo, also needs patching
-          AXORCIST="$CHECKOUTS/axorcist/Package.swift"
-          if [ -f "$AXORCIST" ]; then
-            sed -i '' 's/\.macOS(\.v14)/\.macOS(\.v13)/g' "$AXORCIST"
-            echo "  ✓ Patched axorcist (transitive)"
-          else
-            echo "  ✗ MISSING: $AXORCIST"
-            FAILED=1
-          fi
+          # Patch direct and transitive dependencies that declare macOS 14/15.
+          for dep in peekaboo commander textual elevenlabskit swiftui-math axorcist; do
+            patch_dep "$dep"
+          done
 
           if [ "$FAILED" -ne 0 ]; then
             echo "::error::One or more dependency checkouts not found. Listing checkouts:"
-            ls -1 "$CHECKOUTS" 2>/dev/null || echo "(directory not found)"
+            for root in "${CHECKOUT_ROOTS[@]}"; do
+              echo "-- $root"
+              ls -1 "$root" 2>/dev/null || echo "(directory not found)"
+            done
             exit 1
           fi
 
