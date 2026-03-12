@@ -51,6 +51,8 @@ jobs:
           ALLOW_ADHOC_SIGNING: 1
           # Release config creates Universal Binary (arm64 x86_64) by default
           BUILD_CONFIG: release
+          # Explicitly target both architectures just to be absolutely sure
+          BUILD_ARCHS: "arm64 x86_64"
         run: |
           chmod +x scripts/package-mac-app.sh
           chmod +x scripts/codesign-mac-app.sh
