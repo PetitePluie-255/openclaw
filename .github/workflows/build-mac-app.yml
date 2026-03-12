@@ -1,0 +1,60 @@
+name: Build macOS App
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build OpenClaw for macOS
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: "pnpm"
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Build Mac App
+        env:
+          # CI environments usually don't have Apple Developer certificates configured.
+          # ALLOW_ADHOC_SIGNING=1 allows the script to fallback to ad-hoc ("-") signing,
+          # avoiding build failure due to missing certificates.
+          ALLOW_ADHOC_SIGNING: 1
+          # Release config creates Universal Binary (arm64 x86_64) by default
+          BUILD_CONFIG: release
+        run: |
+          chmod +x scripts/package-mac-app.sh
+          chmod +x scripts/codesign-mac-app.sh
+          ./scripts/package-mac-app.sh
+
+      - name: Compress App Bundle
+        # `actions/upload-artifact` can lose macOS symlinks/executable permissions if uploading a directory.
+        # It's safest to zip the `.app` bundle explicitly before uploading.
+        run: |
+          cd dist
+          zip -ry OpenClaw-macOS.zip OpenClaw.app
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenClaw-macOS-App
+          path: dist/OpenClaw-macOS.zip
+          retention-days: 7
