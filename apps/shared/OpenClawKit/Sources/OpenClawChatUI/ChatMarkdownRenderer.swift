@@ -1,4 +1,5 @@
 import SwiftUI
+import MarkdownUI
 import Textual
 
 public enum ChatMarkdownVariant: String, CaseIterable, Sendable {
@@ -30,9 +31,11 @@ struct ChatMarkdownRenderer: View {
                         font: self.font,
                         textColor: self.textColor))
             } else {
-                Text(LocalizedStringKey(processed.cleaned))
-                    .font(self.font)
-                    .foregroundStyle(self.textColor)
+                Markdown(processed.cleaned)
+                    .markdownTextStyle {
+                        ForegroundColor(self.textColor)
+                        FontSize(.em(1.0))
+                    }
                     .textSelection(.enabled)
             }
 

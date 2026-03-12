@@ -16,6 +16,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/steipete/ElevenLabsKit", exact: "0.1.0"),
         .package(url: "https://github.com/gonzalezreal/textual", exact: "0.3.1"),
+        .package(url: "https://github.com/gonzalezreal/swift-markdown-ui", from: "2.4.1"),
     ],
     targets: [
         .target(
@@ -44,6 +45,10 @@ let package = Package(
                 .product(
                     name: "Textual",
                     package: "textual",
+                    condition: .when(platforms: [.macOS, .iOS])),
+                .product(
+                    name: "MarkdownUI",
+                    package: "swift-markdown-ui",
                     condition: .when(platforms: [.macOS, .iOS])),
             ],
             path: "Sources/OpenClawChatUI",
