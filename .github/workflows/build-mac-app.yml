@@ -12,7 +12,8 @@ on:
 jobs:
   build:
     name: Build OpenClaw for macOS
-    runs-on: macos-latest
+    # Use macOS 15, which has newer Xcode versions available (Xcode 16+)
+    runs-on: macos-15
 
     steps:
       - name: Checkout repository
@@ -29,8 +30,9 @@ jobs:
           node-version: 22.x
           cache: "pnpm"
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+      - name: Select Xcode 16 (Swift 6)
+        # GitHub Actions macOS-15 runners come with Xcode 16.2/16.3
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer || sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
       - name: Build Mac App
         env:
