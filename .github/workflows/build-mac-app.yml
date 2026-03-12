@@ -52,6 +52,17 @@ jobs:
             ${{ runner.os }}-swift-build-${{ hashFiles('apps/macos/Package.resolved') }}-
             ${{ runner.os }}-swift-build-
 
+      - name: Patch Package.swift and Info.plist for macOS 13 compatibility
+        run: |
+          sed -i '' 's/\.macOS(\.v15)/\.macOS(\.v13)/g' apps/macos/Package.swift
+          sed -i '' 's/\.macOS(\.v15)/\.macOS(\.v13)/g' apps/shared/OpenClawKit/Package.swift
+          sed -i '' 's/\.macOS(\.v15)/\.macOS(\.v13)/g' Swabble/Package.swift
+          sed -i '' 's/15\.0/13\.0/g' apps/macos/Sources/OpenClaw/Resources/Info.plist
+
+          echo "Verifying patches (should show v13):"
+          grep -h "macOS(" apps/macos/Package.swift apps/shared/OpenClawKit/Package.swift Swabble/Package.swift
+          grep "13\.0" apps/macos/Sources/OpenClaw/Resources/Info.plist
+
       - name: Build Mac App
         env:
           # CI environments usually don't have Apple Developer certificates configured.
